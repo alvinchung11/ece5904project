@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 from tkcalendar import DateEntry
+from matplotlib import pyplot as plt
 
 WINDOW_TITLE = "System Name"
 
@@ -40,7 +41,7 @@ class PatientDataInputFrame(ttk.Frame):
         super().__init__(parent)
 
         self.title = ttk.Label(self, text="Patient Information")
-        self.title.pack(side="top")
+        self.title.pack(side="top", anchor="w", padx=10, pady=10)
 
         self.names_frame = ttk.Frame(self)
         self.names_frame.pack(side="top", fill="x")
@@ -102,7 +103,33 @@ class DiagnosesInputFrame(ttk.Frame):
         super().__init__(parent)
 
         self.title = ttk.Label(self, text="Diagnosis Data")
-        self.title.pack(side="top")
+        self.title.grid(row=0, sticky="nsew", padx=10, pady=10)
+
+        PRIMARY_DIAGNOSIS_VALUES = ["Unknown", "Stage 1", "Stage 2A", "Stage 2B", "Stage 3", "Stage 4", "Stage 4S"]
+        self.primary_diagnosis = LabeledDropdown(self, controller, label_text="Primary Diagnosis", dropdown_values=PRIMARY_DIAGNOSIS_VALUES)
+
+        self.primary_site = LabeledEntry(self, controller, label_text="Primary Site")
+        self.primary_site.grid(row=1, column=0, padx=10, pady=10, sticky="w")
+
+        self.tissue_organ_origin = LabeledEntry(self, controller, label_text="Tissue or Organ of Origin")
+        self.tissue_organ_origin.grid(row=1, column=1, padx=10, pady=10, sticky="w")
+
+        INSS_STAGE_VALUES = ["Unknown", "Stage 1", "Stage 2A", "Stage 2B", "Stage 3", "Stage 4", "Stage 4S"]
+        self.inss_stage = LabeledDropdown(self, controller, label_text="INSS Stage", dropdown_values=INSS_STAGE_VALUES)
+        self.inss_stage.grid(row=2, column=0, padx=10, pady=10, sticky="w")
+
+        COG_NBL_RISK_GROUP_VALUES = ["Unknown", "Low Risk", "Intermediate Risk", "High Risk"]
+        self.cog_nbl_risk_group = LabeledDropdown(self, controller, label_text="COG Risk Group", dropdown_values=COG_NBL_RISK_GROUP_VALUES)
+        self.cog_nbl_risk_group.grid(row=2, column=1, padx=10, pady=10, sticky="w")
+
+        MKI_VALUES = ["Unknown", "Low", "Intermediate", "High"]
+        self.mki = LabeledDropdown(self, controller, label_text="Mitosis Karyorrhexis Index", dropdown_values=MKI_VALUES)
+        self.mki.grid(row=3, column=0, padx=10, pady=10)
+
+        
+class PlotFrame(ttk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
 
 class GuiRoot(tk.Tk):
     def __init__(self):
@@ -114,23 +141,26 @@ class GuiRoot(tk.Tk):
         self.container = ttk.Frame()
         self.container.pack(fill="both")
         
-        self.test_notebook = ttk.Notebook(self.container)
-        self.test_notebook.pack(fill="both", expand=True)
+        # self.test_notebook = ttk.Notebook(self.container)
+        # self.test_notebook.pack(fill="both", expand=True)
 
-        self.patient_data = PatientDataInputFrame(self.container, self)
+        # self.patient_data = PatientDataInputFrame(self.container, self)
         # self.patient_data.pack(fill="both")
 
-        self.diagnoses_data = DiagnosesInputFrame(self.container, self)
+        # self.diagnoses_data = DiagnosesInputFrame(self.container, self)
         # self.diagnoses_data.pack(fill="both")
 
-        self.test_notebook.add(self.patient_data, text="Patient Information")
-        self.test_notebook.add(self.diagnoses_data, text="Diagnosis Information")
+        # self.test_plot = PlotFrame(self.container, self)
+
+
+        # self.test_notebook.add(self.patient_data, text="Patient Information")
+        # self.test_notebook.add(self.diagnoses_data, text="Diagnosis Information")
+        # self.test_notebook.add(self.test_plot, text="Test Plot")
 
 def main():
     
     root = GuiRoot()
     root.mainloop()
-
 
 if __name__ == "__main__":
     main()
