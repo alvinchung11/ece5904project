@@ -4,6 +4,7 @@ from tkcalendar import DateEntry
 from matplotlib import pyplot as plt
 
 WINDOW_TITLE = "System Name"
+TITLE_FONT = ("TkDefaultFont", 24)
 
 class LabeledEntry(ttk.Frame):
     def __init__(self, parent, controller, label_text):
@@ -40,7 +41,7 @@ class PatientDataInputFrame(ttk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
 
-        self.title = ttk.Label(self, text="Patient Information")
+        self.title = ttk.Label(self, text="Patient Information", font=TITLE_FONT)
         self.title.pack(side="top", anchor="w", padx=10, pady=10)
 
         self.names_frame = ttk.Frame(self)
@@ -98,11 +99,13 @@ class PatientDataInputFrame(ttk.Frame):
 
         print(patient_info)
 
+        self.grid_remove()
+
 class DiagnosesInputFrame(ttk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
 
-        self.title = ttk.Label(self, text="Diagnosis Data")
+        self.title = ttk.Label(self, text="Diagnosis Data", font=TITLE_FONT)
         self.title.grid(row=0, sticky="nsew", padx=10, pady=10)
 
         PRIMARY_DIAGNOSIS_VALUES = ["Unknown", "Stage 1", "Stage 2A", "Stage 2B", "Stage 3", "Stage 4", "Stage 4S"]
@@ -130,30 +133,67 @@ class PlotFrame(ttk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
 
+class MainMenuFrame(ttk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
 
+        self.title_label = ttk.Label(self, text="Main Menu", font=TITLE_FONT)
+        self.title_label.pack(pady=10)
+
+        self.new_patient_button = ttk.Button(self, text="New Patient", padding=10)
+        self.new_patient_button.pack(pady=5)
+
+        self.load_patient_button = ttk.Button(self, text="Load Patient", padding=10)
+        self.load_patient_button.pack(pady=5)
 
 class GuiRoot(tk.Tk):
     def __init__(self):
         super().__init__()
         
         self.title(WINDOW_TITLE)
-        self.geometry("800x600")
+
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
+
+        self.geometry("{}x{}".format(int(screen_width*0.8), int(screen_height*0.8)))
         
+        self.minsize(width=600, height=400)
+
+        self.frames = dict()
+
+        self.style = ttk.Style()
+        # self.style.theme_use("default")
+        self.style.configure("TPanedwindow",
+                             background="gray")
+
         self.container = ttk.Frame()
-        self.container.pack(fill="both")
+        self.container.pack(fill="both", expand=True)
+
+        # Main horizontal layout, left and right
+        self.main_hor_pane = ttk.PanedWindow(self.container, orient="horizontal")
+        self.main_hor_pane.pack(fill="both", expand=True)
+
+        # Add frame to left
+        self.mainmenu = MainMenuFrame(self.main_hor_pane, self)
+        self.main_hor_pane.add(self.mainmenu, weight=1)
+
+        # Add a vertical layout to the right side
+        self.righ_vert_pane = ttk.PanedWindow(self.main_hor_pane, orient="vertical")
+        self.main_hor_pane.add(self.righ_vert_pane, weight=5)
+
+        # Frames within right side
+        self.patient_data = PatientDataInputFrame(self.righ_vert_pane, self)
+        self.righ_vert_pane.add(self.patient_data, weight=5)
         
-        # self.test_notebook = ttk.Notebook(self.container)
-        # self.test_notebook.pack(fill="both", expand=True)
-
-        # self.patient_data = PatientDataInputFrame(self.container, self)
-        # self.patient_data.pack(fill="both")
-
-        # self.diagnoses_data = DiagnosesInputFrame(self.container, self)
-        # self.diagnoses_data.pack(fill="both")
+        self.diagnoses_data = DiagnosesInputFrame(self.righ_vert_pane, self)
+        self.righ_vert_pane.add(self.diagnoses_data, weight=1)
 
         # self.test_plot = PlotFrame(self.container, self)
 
+        # self.test_notebook = ttk.Notebook(self.container)
+        # self.test_notebook.pack(fill="both", expand=True)
 
+        # self.patient_data.grid(row=0, column=0)
         # self.test_notebook.add(self.patient_data, text="Patient Information")
         # self.test_notebook.add(self.diagnoses_data, text="Diagnosis Information")
         # self.test_notebook.add(self.test_plot, text="Test Plot")
