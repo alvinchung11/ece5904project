@@ -37,9 +37,10 @@ class LabeledCalendar(ttk.Frame):
         self.calendar = DateEntry(self, selectmode="day", state="readonly")
         self.calendar.pack(side="top", anchor="w")
 
-class PatientDataInputFrame(ttk.Frame):
+class PatientDataInputWindow(tk.Toplevel):
     def __init__(self, parent, controller):
         super().__init__(parent)
+        self.grab_set()
 
         self.title = ttk.Label(self, text="Patient Information", font=TITLE_FONT)
         self.title.pack(side="top", anchor="w", padx=10, pady=10)
@@ -74,14 +75,17 @@ class PatientDataInputFrame(ttk.Frame):
         self.birth_date_frame = LabeledCalendar(self, controller, "Birth Date")
         self.birth_date_frame.pack(side="top", fill="x", padx=10, pady=10)
         
-        self.button = ttk.Button(self, text="Save", command=self.save_patient_info)
-        self.button.pack(anchor="w", padx=10, pady=10)
+        self.save_button = ttk.Button(self, text="Save", command=self.save_callback)
+        self.save_button.pack(side="left", padx=10, pady=10)
+
+        self.cancel_button = ttk.Button(self, text="Cancel", command=self.cancel_callback)
+        self.cancel_button.pack(side="left", padx=10, pady=10)
     
     def calendar_fix(self, event):
         event.widget._top_cal.overrideredirect(False)
         print("what")
 
-    def save_patient_info(self):
+    def save_callback(self):
         patient_info = dict()
 
         patient_info["first_name"] = self.first_name_entry.entry.get()
@@ -99,9 +103,14 @@ class PatientDataInputFrame(ttk.Frame):
 
         print(patient_info)
 
-        self.grid_remove()
+        self.grab_release()
+        self.destroy()
 
-class DiagnosesInputFrame(ttk.Frame):
+    def cancel_callback(self):
+        self.grab_release()
+        self.destroy()
+
+class DiagnosesInputWindow(ttk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
 
@@ -133,18 +142,26 @@ class PlotFrame(ttk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
 
-class MainMenuFrame(ttk.Frame):
+        self.title = ttk.Label(self, text="Plot Data", font=TITLE_FONT)
+        self.title.pack()
+
+class PatientSelectFrame(ttk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
 
-        self.title_label = ttk.Label(self, text="Main Menu", font=TITLE_FONT)
+        self.controller = controller
+
+        self.title_label = ttk.Label(self, text="Patient Data", font=TITLE_FONT)
         self.title_label.pack(pady=10)
 
-        self.new_patient_button = ttk.Button(self, text="New Patient", padding=10)
+        self.new_patient_button = ttk.Button(self, text="Add New Data", padding=10, width=20, command=self.new_patient_callback)
         self.new_patient_button.pack(pady=5)
 
-        self.load_patient_button = ttk.Button(self, text="Load Patient", padding=10)
-        self.load_patient_button.pack(pady=5)
+        # self.load_patient_button = ttk.Button(self, text="Load Patient", padding=10, width=20)
+        # self.load_patient_button.pack(pady=5)
+
+    def new_patient_callback(self):
+        patient_info_window = PatientDataInputWindow(self, self.controller)
 
 class GuiRoot(tk.Tk):
     def __init__(self):
@@ -159,7 +176,7 @@ class GuiRoot(tk.Tk):
         
         self.minsize(width=600, height=400)
 
-        self.frames = dict()
+        # self.frames = dict()
 
         self.style = ttk.Style()
         # self.style.theme_use("default")
@@ -173,22 +190,26 @@ class GuiRoot(tk.Tk):
         self.main_hor_pane = ttk.PanedWindow(self.container, orient="horizontal")
         self.main_hor_pane.pack(fill="both", expand=True)
 
-        # Add frame to left
-        self.mainmenu = MainMenuFrame(self.main_hor_pane, self)
-        self.main_hor_pane.add(self.mainmenu, weight=1)
+        # Add frame to left pane
+        self.left_pane_frame = ttk.Frame(self.main_hor_pane)
+        self.main_hor_pane.add(self.left_pane_frame, weight=1)
+
+        self.patient_select = PatientSelectFrame(self.left_pane_frame, self)
+        self.patient_select.pack(expand=True)
 
         # Add a vertical layout to the right side
         self.righ_vert_pane = ttk.PanedWindow(self.main_hor_pane, orient="vertical")
         self.main_hor_pane.add(self.righ_vert_pane, weight=5)
 
         # Frames within right side
-        self.patient_data = PatientDataInputFrame(self.righ_vert_pane, self)
-        self.righ_vert_pane.add(self.patient_data, weight=5)
+        # self.patient_data = PatientDataInputFrame(self.righ_vert_pane, self)
+        # self.righ_vert_pane.add(self.patient_data, weight=5)
         
-        self.diagnoses_data = DiagnosesInputFrame(self.righ_vert_pane, self)
-        self.righ_vert_pane.add(self.diagnoses_data, weight=1)
+        # self.diagnoses_data = DiagnosesInputFrame(self.righ_vert_pane, self)
+        # self.righ_vert_pane.add(self.diagnoses_data, weight=1)
 
-        # self.test_plot = PlotFrame(self.container, self)
+        self.test_plot = PlotFrame(self.container, self)
+        self.righ_vert_pane.add(self.test_plot, weight=5)
 
         # self.test_notebook = ttk.Notebook(self.container)
         # self.test_notebook.pack(fill="both", expand=True)
@@ -197,3 +218,10 @@ class GuiRoot(tk.Tk):
         # self.test_notebook.add(self.patient_data, text="Patient Information")
         # self.test_notebook.add(self.diagnoses_data, text="Diagnosis Information")
         # self.test_notebook.add(self.test_plot, text="Test Plot")
+
+
+if __name__ == "__main__":
+    test_root = tk.Tk()
+    window = PatientDataInputWindow(test_root, test_root) 
+
+    test_root.mainloop()
