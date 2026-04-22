@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk
+from tkinter import ttk, filedialog
 from matplotlib import pyplot as plt
 from datetime import date
 import calendar
@@ -9,6 +9,7 @@ from patient_data import Diagnosis
 
 WINDOW_TITLE = "System Name"
 TITLE_FONT = ("TkDefaultFont", 24)
+H1_FONT = ("TkDefaultFont", 12)
 
 MONTH_VALUES = list(range(1,12+1))
 EARLIEST_YEAR = 1970
@@ -16,6 +17,8 @@ EARLIEST_YEAR = 1970
 GENDER_VALUES = ["Not Specified", "Male", "Female"]
 ETHNICITY_VALUES = ["Not Specified", "Not Hispanic or Latino", "Hispanic or Latino"]
 RACE_VALUES = ["Not Specified", "Asian", "Black", "White", "Native American", "Pacific Islander", "Other"]
+
+PATIENT_SAVE_FILETYPE = ("JSON Files", "*.json")
 
 def get_window_placement(screen_width, screen_height, window_width, window_height):
     placement_x = int(screen_width / 2) - int(window_width / 2)
@@ -218,8 +221,12 @@ class PatientDataInputWindow(tk.Toplevel):
         patient.birth_day = birth_day
         patient.birth_year = birth_year
 
+        save_filepath = filedialog.asksaveasfilename(filetypes=[PATIENT_SAVE_FILETYPE], defaultextension=".json", title="Save Patient Data")
+        patient.save_data(save_filepath)
+
         self.controller.set_current_patient(patient)
-    
+        self.controller.show_patient_diagnosis_split()
+
         self.grab_release()
         self.destroy()
 
@@ -284,6 +291,44 @@ class PatientInfoFrame(ttk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
 
+        self.title_label = ttk.Label(self, text="Patient Information", font=TITLE_FONT)
+        self.title_label.pack(anchor="w", padx=10, pady=10)
+
+        patient = controller.get_current_patient()
+
+        name_str = "Name: {}, {}".format(patient.last_name, patient.first_name)
+        gender_str = "Gender: {}".format(patient.gender)
+        ethnicity_str = "Ethnicity: {}".format(patient.ethnicity)
+        race_str = "Race: {}".format(patient.race)
+
+        birth_month = calendar.month_name[patient.birth_month]
+
+        date_of_birth_str = "Date of Birth: {} {}, {}".format(birth_month, patient.birth_day, patient.birth_year)
+
+        self.edit_button = ttk.Button(self, text="Edit")
+        self.edit_button.pack(anchor="w", padx=10)
+
+        self.name = ttk.Label(self, text=name_str, font=H1_FONT)
+        self.name.pack(anchor="w", padx=10, pady=10)
+
+        self_date_of_birth = ttk.Label(self, text=date_of_birth_str, font=H1_FONT)
+        self_date_of_birth.pack(anchor="w", padx=10, pady=10)
+
+        self.gender = ttk.Label(self, text=gender_str, font=H1_FONT)
+        self.gender.pack(anchor="w", padx=10, pady=10)
+
+        self.ethnicity = ttk.Label(self, text=ethnicity_str, font=H1_FONT)
+        self.ethnicity.pack(anchor="w", padx=10, pady=10)
+
+        self.race = ttk.Label(self, text=race_str, font=H1_FONT)
+        self.race.pack(anchor="w", padx=10, pady=10)
+
+class DiagnosesInfoFrame(ttk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+
+        self.title_label = ttk.Label(self, text="Diagnoses", font=TITLE_FONT)
+        self.title_label.pack(anchor="w", padx=10, pady=10)
 
 class GuiRoot(tk.Tk):
     def __init__(self):
@@ -323,21 +368,6 @@ class GuiRoot(tk.Tk):
         self.left_pane_frame = ttk.Frame(self.main_hor_pane)
         self.main_hor_pane.add(self.left_pane_frame, weight=1)
 
-        # TODO implement the split info
-        # self.patient_diagnosis_split = ttk.PanedWindow(self.left_pane_frame, orient="vertical")
-
-        # self.patient_info = ttk.Frame(self.left_pane_frame)
-        # self.patient_diagnosis_split.add(self.patient_info, weight=1)
-
-        # label = ttk.Label(self.patient_info, text="Patient")
-        # label.pack()
-
-        # self.diagnoses_info = ttk.Frame(self.patient_diagnosis_split)
-        # self.patient_diagnosis_split.add(self.diagnoses_info, weight=1)
-
-        # label2 = ttk.Label(self.diagnoses_info, text="Diagnosis")
-        # label2.pack()
-
         self.patient_select = PatientSelectFrame(self.left_pane_frame, self)
         self.patient_select.pack(expand=True)
 
@@ -362,16 +392,21 @@ class GuiRoot(tk.Tk):
 
     def show_patient_diagnosis_split(self):
         self.patient_select.pack_forget()
+
+        self.patient_diagnosis_split = ttk.PanedWindow(self.left_pane_frame, orient="vertical")
         self.patient_diagnosis_split.pack(fill="both", expand=True)
+
+        self.patient_info = PatientInfoFrame(self.patient_diagnosis_split, self)
+        self.patient_diagnosis_split.add(self.patient_info, weight=1)
+
+        self.diagnoses_info = DiagnosesInfoFrame(self.patient_diagnosis_split, self)
+        self.patient_diagnosis_split.add(self.diagnoses_info, weight=2)
 
     def set_current_patient(self, patient : Patient):
         self.current_patient = patient
 
-        print(self.current_patient.first_name)
-        print(self.current_patient.last_name)
-        print(self.current_patient.birth_month)
-        print(self.current_patient.birth_day)
-        print(self.current_patient.birth_year)
+    def get_current_patient(self):
+        return self.current_patient
 
 if __name__ == "__main__":
     test_root = tk.Tk()

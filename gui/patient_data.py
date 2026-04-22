@@ -1,4 +1,5 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
+import json
 
 # Class to hold patient data
 
@@ -23,3 +24,9 @@ class Patient:
     birth_year : int = 1970
 
     diagnoses : list[Diagnosis] = field(default_factory=list)
+
+    def save_data(self, filepath):
+        file = open(filepath, "w")
+        patient_dict = asdict(self)
+        json.dump(patient_dict, file)
+        file.close()
