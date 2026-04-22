@@ -4,11 +4,18 @@ from matplotlib import pyplot as plt
 from datetime import date
 import calendar
 
+from patient_data import Patient
+from patient_data import Diagnosis
+
 WINDOW_TITLE = "System Name"
 TITLE_FONT = ("TkDefaultFont", 24)
 
 MONTH_VALUES = list(range(1,12+1))
 EARLIEST_YEAR = 1970
+
+GENDER_VALUES = ["Not Specified", "Male", "Female"]
+ETHNICITY_VALUES = ["Not Specified", "Not Hispanic or Latino", "Hispanic or Latino"]
+RACE_VALUES = ["Not Specified", "Asian", "Black", "White", "Native American", "Pacific Islander", "Other"]
 
 def get_window_placement(screen_width, screen_height, window_width, window_height):
     placement_x = int(screen_width / 2) - int(window_width / 2)
@@ -71,7 +78,7 @@ class LabeledCalendar(ttk.Frame):
         self.month_label = ttk.Label(self.month_frame, text="Month")
         self.month_label.pack(side="top", anchor="w")
 
-        self.month_combo = ttk.Combobox(self.month_frame, width=5, values=MONTH_VALUES)
+        self.month_combo = ttk.Combobox(self.month_frame, width=5, values=MONTH_VALUES, state="readonly")
         self.month_combo.set(initial_month)
         self.month_combo.bind("<<ComboboxSelected>>", self.update_day_values)
         self.month_combo.pack(side="top", anchor="w")
@@ -83,7 +90,7 @@ class LabeledCalendar(ttk.Frame):
         self.day_label = ttk.Label(self.day_frame, text="Day")
         self.day_label.pack(side="top", anchor="w")
         
-        self.day_combo = ttk.Combobox(self.day_frame, width=5, values=initial_day_values)
+        self.day_combo = ttk.Combobox(self.day_frame, width=5, values=initial_day_values, state="readonly")
         self.day_combo.set(initial_day)
         self.day_combo.pack(side="top", anchor="w")
 
@@ -94,7 +101,7 @@ class LabeledCalendar(ttk.Frame):
         self.year_label = ttk.Label(self.year_frame, text="Year")
         self.year_label.pack(side="top", anchor="w")
 
-        self.year_combo = ttk.Combobox(self.year_frame, width=10, values=year_values)
+        self.year_combo = ttk.Combobox(self.year_frame, width=10, values=year_values, state="readonly")
         self.year_combo.set(initial_year)
         self.year_combo.bind("<<ComboboxSelected>>", self.update_day_values)
         self.year_combo.pack(side="top", anchor="w")
@@ -115,11 +122,21 @@ class LabeledCalendar(ttk.Frame):
         if(selected_day > day_range[-1]):
             self.day_combo.set(day_range[-1])
 
+    def get_date(self):
+        selected_month = int(self.month_combo.get())
+        selected_day = int(self.day_combo.get())
+        selected_year = int(self.year_combo.get())
+
+        return selected_month, selected_day, selected_year
+
 class PatientDataInputWindow(tk.Toplevel):
-    def __init__(self, parent, controller):
+    def __init__(self, parent, controller, new_patient=True):
         super().__init__(parent)
         self.grab_set() # Prevent other interactions until window is closed 
         
+        self.controller = controller
+        self.new_patient = new_patient
+
         """ Window size and placement """
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
@@ -132,7 +149,12 @@ class PatientDataInputWindow(tk.Toplevel):
         self.geometry("+{}+{}".format(placement_x, placement_y))
 
         """ Title label """
-        self.title = ttk.Label(self, text="Patient Information", font=TITLE_FONT)
+        if(new_patient):
+            title_text = "New Patient Information"
+        else:
+            title_text = "Edit Patient Information"
+
+        self.title = ttk.Label(self, text=title_text, font=TITLE_FONT)
         self.title.pack(side="top", anchor="w", padx=10, pady=10)
 
         """ First and last name """
@@ -146,17 +168,12 @@ class PatientDataInputWindow(tk.Toplevel):
         self.last_name_entry.pack(side="left", padx=10, pady=10)
 
         """ Gender """
-        GENDER_VALUES = ["Not Specified", "Male", "Female"]
-
         self.gender_dropdown = LabeledDropdown(self, controller, "Gender", GENDER_VALUES)
         self.gender_dropdown.pack(side="top", fill="x", padx=10, pady=10)
 
         """ Race and ethnicity """
         self.race_eth_frame = ttk.Frame(self)
         self.race_eth_frame.pack(side="top", fill="x")
-
-        ETHNICITY_VALUES = ["Not Specified", "Not Hispanic or Latino", "Hispanic or Latino"]
-        RACE_VALUES = ["Not Specified", "Asian", "Black", "White", "Native American", "Pacific Islander", "Other"]
 
         self.ethnicity_dropdown = LabeledDropdown(self.race_eth_frame, controller, "Ethnicity", ETHNICITY_VALUES)
         self.ethnicity_dropdown.pack(side="left", padx=10, pady=10)
@@ -175,18 +192,34 @@ class PatientDataInputWindow(tk.Toplevel):
         self.cancel_button.pack(side="left", padx=10, pady=10)
 
     def save_callback(self):
-        patient_info = dict()
 
-        patient_info["first_name"] = self.first_name_entry.entry.get()
-        patient_info["last_name"] = self.last_name_entry.entry.get()
+        first_name = self.first_name_entry.entry.get()
+        last_name = self.last_name_entry.entry.get()
 
-        patient_info["gender"] = self.gender_dropdown.combo.get()
+        # if(len(first_name) < 1 or len(last_name) < 1):
+        #     print("Please fill out first and last name")
+        #     return
 
-        patient_info["race"] = self.race_dropdown.combo.get()
-        patient_info["ethnicity"] = self.ethnicity_dropdown.combo.get()
+        gender = self.gender_dropdown.combo.get()
+        race = self.race_dropdown.combo.get()
+        ethnicity = self.ethnicity_dropdown.combo.get()
 
-        print(patient_info)
+        birth_month, birth_day, birth_year = self.birth_date_frame.get_date()
 
+        patient = Patient(first_name, last_name)
+        # if(not self.new_patient):
+        #     pass
+
+        patient.gender = gender
+        patient.race = race
+        patient.ethnicity = ethnicity
+
+        patient.birth_month = birth_month
+        patient.birth_day = birth_day
+        patient.birth_year = birth_year
+
+        self.controller.set_current_patient(patient)
+    
         self.grab_release()
         self.destroy()
 
@@ -247,9 +280,16 @@ class PatientSelectFrame(ttk.Frame):
     def new_patient_callback(self):
         patient_info_window = PatientDataInputWindow(self, self.controller)
 
+class PatientInfoFrame(ttk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+
+
 class GuiRoot(tk.Tk):
     def __init__(self):
         super().__init__()
+        
+        self.current_patient = None
         
         self.title(WINDOW_TITLE)
 
@@ -283,22 +323,34 @@ class GuiRoot(tk.Tk):
         self.left_pane_frame = ttk.Frame(self.main_hor_pane)
         self.main_hor_pane.add(self.left_pane_frame, weight=1)
 
+        # TODO implement the split info
+        # self.patient_diagnosis_split = ttk.PanedWindow(self.left_pane_frame, orient="vertical")
+
+        # self.patient_info = ttk.Frame(self.left_pane_frame)
+        # self.patient_diagnosis_split.add(self.patient_info, weight=1)
+
+        # label = ttk.Label(self.patient_info, text="Patient")
+        # label.pack()
+
+        # self.diagnoses_info = ttk.Frame(self.patient_diagnosis_split)
+        # self.patient_diagnosis_split.add(self.diagnoses_info, weight=1)
+
+        # label2 = ttk.Label(self.diagnoses_info, text="Diagnosis")
+        # label2.pack()
+
         self.patient_select = PatientSelectFrame(self.left_pane_frame, self)
         self.patient_select.pack(expand=True)
 
         # Add a vertical layout to the right side
-        self.righ_vert_pane = ttk.PanedWindow(self.main_hor_pane, orient="vertical")
-        self.main_hor_pane.add(self.righ_vert_pane, weight=5)
+        self.right_vert_pane = ttk.PanedWindow(self.main_hor_pane, orient="vertical")
+        self.main_hor_pane.add(self.right_vert_pane, weight=5)
 
         # Frames within right side
-        # self.patient_data = PatientDataInputFrame(self.righ_vert_pane, self)
-        # self.righ_vert_pane.add(self.patient_data, weight=5)
+        self.test_plot = PlotFrame(self.right_vert_pane, self)
+        self.right_vert_pane.add(self.test_plot, weight=5)
         
         # self.diagnoses_data = DiagnosesInputFrame(self.righ_vert_pane, self)
         # self.righ_vert_pane.add(self.diagnoses_data, weight=1)
-
-        self.test_plot = PlotFrame(self.container, self)
-        self.righ_vert_pane.add(self.test_plot, weight=5)
 
         # self.test_notebook = ttk.Notebook(self.container)
         # self.test_notebook.pack(fill="both", expand=True)
@@ -308,6 +360,18 @@ class GuiRoot(tk.Tk):
         # self.test_notebook.add(self.diagnoses_data, text="Diagnosis Information")
         # self.test_notebook.add(self.test_plot, text="Test Plot")
 
+    def show_patient_diagnosis_split(self):
+        self.patient_select.pack_forget()
+        self.patient_diagnosis_split.pack(fill="both", expand=True)
+
+    def set_current_patient(self, patient : Patient):
+        self.current_patient = patient
+
+        print(self.current_patient.first_name)
+        print(self.current_patient.last_name)
+        print(self.current_patient.birth_month)
+        print(self.current_patient.birth_day)
+        print(self.current_patient.birth_year)
 
 if __name__ == "__main__":
     test_root = tk.Tk()
