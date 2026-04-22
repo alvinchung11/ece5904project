@@ -1,10 +1,20 @@
 import tkinter as tk
 from tkinter import ttk
-from tkcalendar import DateEntry
 from matplotlib import pyplot as plt
+from datetime import date
+import calendar
 
 WINDOW_TITLE = "System Name"
 TITLE_FONT = ("TkDefaultFont", 24)
+
+MONTH_VALUES = list(range(1,12+1))
+EARLIEST_YEAR = 1970
+
+def get_window_placement(screen_width, screen_height, window_width, window_height):
+    placement_x = int(screen_width / 2) - int(window_width / 2)
+    placement_y = int(screen_height / 2) - int(window_height / 2)
+    
+    return placement_x, placement_y
 
 class LabeledEntry(ttk.Frame):
     def __init__(self, parent, controller, label_text):
@@ -28,23 +38,104 @@ class LabeledDropdown(ttk.Frame):
         self.combo.pack(side="top", anchor="w")
 
 class LabeledCalendar(ttk.Frame):
-    def __init__(self, parent, controller, label_text,):
+    def __init__(self, parent, controller, label_text, initial_month=None, initial_day=None, initial_year=None):
         super().__init__(parent)
-
+        
         self.label = ttk.Label(self, text=label_text, font="")
         self.label.pack(side="top", anchor="w")
 
-        self.calendar = DateEntry(self, selectmode="day", state="readonly")
-        self.calendar.pack(side="top", anchor="w")
+        current_date = date.today()
+        year_values = list(reversed(range(EARLIEST_YEAR, current_date.year+1)))
+
+        if(initial_month == None):
+            initial_month = current_date.month
+
+        if(initial_year == None):
+            initial_year = current_date.year
+
+        initial_day_range = calendar.monthrange(initial_year, initial_month)[1]
+        initial_day_values = list(range(1, initial_day_range+1))
+
+        if(initial_day == None):
+            initial_day = current_date.day
+
+        if(initial_day > initial_day_values[-1]):
+            initial_day = initial_day_values[-1]
+        elif(initial_day < 1):
+            initial_day = 1
+
+        """ Month """
+        self.month_frame = ttk.Frame(self)
+        self.month_frame.pack(side="left")
+
+        self.month_label = ttk.Label(self.month_frame, text="Month")
+        self.month_label.pack(side="top", anchor="w")
+
+        self.month_combo = ttk.Combobox(self.month_frame, width=5, values=MONTH_VALUES)
+        self.month_combo.set(initial_month)
+        self.month_combo.bind("<<ComboboxSelected>>", self.update_day_values)
+        self.month_combo.pack(side="top", anchor="w")
+
+        """ Day """
+        self.day_frame = ttk.Frame(self)
+        self.day_frame.pack(side="left", padx=10)
+
+        self.day_label = ttk.Label(self.day_frame, text="Day")
+        self.day_label.pack(side="top", anchor="w")
+        
+        self.day_combo = ttk.Combobox(self.day_frame, width=5, values=initial_day_values)
+        self.day_combo.set(initial_day)
+        self.day_combo.pack(side="top", anchor="w")
+
+        """ Year """
+        self.year_frame = ttk.Frame(self)
+        self.year_frame.pack(side="left")
+
+        self.year_label = ttk.Label(self.year_frame, text="Year")
+        self.year_label.pack(side="top", anchor="w")
+
+        self.year_combo = ttk.Combobox(self.year_frame, width=10, values=year_values)
+        self.year_combo.set(initial_year)
+        self.year_combo.bind("<<ComboboxSelected>>", self.update_day_values)
+        self.year_combo.pack(side="top", anchor="w")
+
+    def update_day_values(self, event):
+        selected_month = int(self.month_combo.get())
+        selected_day = int(self.day_combo.get())
+        selected_year = int(self.year_combo.get())
+
+        # Determine the number of days in the month
+        num_days = calendar.monthrange(selected_year, selected_month)[1]
+        day_range = list(range(1, num_days+1))
+        
+        # Set possible day values accordingly
+        self.day_combo.configure(values=day_range)
+
+        # Set the selected day if it exceeds new range
+        if(selected_day > day_range[-1]):
+            self.day_combo.set(day_range[-1])
 
 class PatientDataInputWindow(tk.Toplevel):
     def __init__(self, parent, controller):
         super().__init__(parent)
-        self.grab_set()
+        self.grab_set() # Prevent other interactions until window is closed 
+        
+        """ Window size and placement """
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
 
+        window_width = self.winfo_reqwidth()
+        window_height = self.winfo_reqheight()
+
+        placement_x, placement_y = get_window_placement(screen_width, screen_height, window_width, window_height)
+
+        self.geometry("+{}+{}".format(placement_x, placement_y))
+
+        """ Title label """
         self.title = ttk.Label(self, text="Patient Information", font=TITLE_FONT)
         self.title.pack(side="top", anchor="w", padx=10, pady=10)
 
+        """ First and last name """
         self.names_frame = ttk.Frame(self)
         self.names_frame.pack(side="top", fill="x")
 
@@ -54,16 +145,18 @@ class PatientDataInputWindow(tk.Toplevel):
         self.last_name_entry = LabeledEntry(self.names_frame, controller, "Last Name")
         self.last_name_entry.pack(side="left", padx=10, pady=10)
 
-        GENDER_VALUES = ["Unknown", "Male", "Female"]
+        """ Gender """
+        GENDER_VALUES = ["Not Specified", "Male", "Female"]
 
         self.gender_dropdown = LabeledDropdown(self, controller, "Gender", GENDER_VALUES)
         self.gender_dropdown.pack(side="top", fill="x", padx=10, pady=10)
 
+        """ Race and ethnicity """
         self.race_eth_frame = ttk.Frame(self)
         self.race_eth_frame.pack(side="top", fill="x")
 
-        ETHNICITY_VALUES = ["Unknown", "Not Hispanic or Latino", "Hispanic or Latino"]
-        RACE_VALUES = ["Unknown", "Asian", "Black", "White", "Native American", "Pacific Islander", "Other"]
+        ETHNICITY_VALUES = ["Not Specified", "Not Hispanic or Latino", "Hispanic or Latino"]
+        RACE_VALUES = ["Not Specified", "Asian", "Black", "White", "Native American", "Pacific Islander", "Other"]
 
         self.ethnicity_dropdown = LabeledDropdown(self.race_eth_frame, controller, "Ethnicity", ETHNICITY_VALUES)
         self.ethnicity_dropdown.pack(side="left", padx=10, pady=10)
@@ -71,19 +164,15 @@ class PatientDataInputWindow(tk.Toplevel):
         self.race_dropdown = LabeledDropdown(self.race_eth_frame, controller, "Race", RACE_VALUES)
         self.race_dropdown.pack(side="left", padx=10, pady=10)
 
-        # TODO Fix bug with calendar coarse month/year selection
-        self.birth_date_frame = LabeledCalendar(self, controller, "Birth Date")
+        """ Date of Birth """
+        self.birth_date_frame = LabeledCalendar(self, controller, "Date of Birth")
         self.birth_date_frame.pack(side="top", fill="x", padx=10, pady=10)
-        
+
         self.save_button = ttk.Button(self, text="Save", command=self.save_callback)
         self.save_button.pack(side="left", padx=10, pady=10)
 
         self.cancel_button = ttk.Button(self, text="Cancel", command=self.cancel_callback)
         self.cancel_button.pack(side="left", padx=10, pady=10)
-    
-    def calendar_fix(self, event):
-        event.widget._top_cal.overrideredirect(False)
-        print("what")
 
     def save_callback(self):
         patient_info = dict()
@@ -95,11 +184,6 @@ class PatientDataInputWindow(tk.Toplevel):
 
         patient_info["race"] = self.race_dropdown.combo.get()
         patient_info["ethnicity"] = self.ethnicity_dropdown.combo.get()
-
-        birth_date = self.birth_date_frame.calendar.get_date()
-        patient_info["birth_year"] = birth_date.year
-        patient_info["birth_month"] = birth_date.month
-        patient_info["birth_day"] = birth_date.day
 
         print(patient_info)
 
@@ -172,7 +256,12 @@ class GuiRoot(tk.Tk):
         screen_width = self.winfo_screenwidth()
         screen_height = self.winfo_screenheight()
 
-        self.geometry("{}x{}".format(int(screen_width*0.8), int(screen_height*0.8)))
+        window_width = int(screen_width*0.8)
+        window_height = int(screen_height*0.8)
+
+        placement_x, placement_y = get_window_placement(screen_width, screen_height, window_width, window_height)
+
+        self.geometry("{}x{}+{}+{}".format(window_width, window_height, placement_x, placement_y))
         
         self.minsize(width=600, height=400)
 
