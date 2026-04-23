@@ -6,6 +6,7 @@ import calendar
 
 from patient_data import Patient
 from patient_data import Diagnosis
+from patient_data import save_patient_data, load_patient_data, load_encoded_labels
 
 WINDOW_TITLE = "System Name"
 TITLE_FONT = ("TkDefaultFont", 24)
@@ -19,6 +20,8 @@ ETHNICITY_VALUES = ["Not Specified", "Not Hispanic or Latino", "Hispanic or Lati
 RACE_VALUES = ["Not Specified", "Asian", "Black", "White", "Native American", "Pacific Islander", "Other"]
 
 PATIENT_SAVE_FILETYPE = ("JSON Files", "*.json")
+
+ENCODED_LABELS_FILEPATH = "../data/encoded_labels.json"
 
 def get_window_placement(screen_width, screen_height, window_width, window_height):
     placement_x = int(screen_width / 2) - int(window_width / 2)
@@ -36,16 +39,22 @@ class LabeledEntry(ttk.Frame):
         self.entry = ttk.Entry(self)
         self.entry.pack(side="top", anchor="w")
 
+    def get(self):
+        return self.entry.get()
+
 class LabeledDropdown(ttk.Frame):
-    def __init__(self, parent, controller, label_text, dropdown_values):
+    def __init__(self, parent, controller, label_text, dropdown_values, width=None):
         super().__init__(parent)
 
         self.label = ttk.Label(self, text=label_text, font="")
         self.label.pack(side="top", anchor="w")
 
-        self.combo = ttk.Combobox(self, values=dropdown_values, state="readonly")
+        self.combo = ttk.Combobox(self, values=dropdown_values, state="readonly", width=width)
         self.combo.set(dropdown_values[0])
         self.combo.pack(side="top", anchor="w")
+
+    def get(self):
+        return self.combo.get()
 
 class LabeledCalendar(ttk.Frame):
     def __init__(self, parent, controller, label_text, initial_month=None, initial_day=None, initial_year=None):
@@ -196,16 +205,16 @@ class PatientDataInputWindow(tk.Toplevel):
 
     def save_callback(self):
 
-        first_name = self.first_name_entry.entry.get()
-        last_name = self.last_name_entry.entry.get()
+        first_name = self.first_name_entry.get()
+        last_name = self.last_name_entry.get()
 
         # if(len(first_name) < 1 or len(last_name) < 1):
         #     print("Please fill out first and last name")
         #     return
 
-        gender = self.gender_dropdown.combo.get()
-        race = self.race_dropdown.combo.get()
-        ethnicity = self.ethnicity_dropdown.combo.get()
+        gender = self.gender_dropdown.get()
+        race = self.race_dropdown.get()
+        ethnicity = self.ethnicity_dropdown.get()
 
         birth_month, birth_day, birth_year = self.birth_date_frame.get_date()
 
@@ -221,8 +230,8 @@ class PatientDataInputWindow(tk.Toplevel):
         patient.birth_day = birth_day
         patient.birth_year = birth_year
 
-        save_filepath = filedialog.asksaveasfilename(filetypes=[PATIENT_SAVE_FILETYPE], defaultextension=".json", title="Save Patient Data")
-        patient.save_data(save_filepath)
+        save_filepath = filedialog.asksaveasfilename(parent=self, filetypes=[PATIENT_SAVE_FILETYPE], defaultextension=".json", title="Save Patient Data")
+        save_patient_data(patient, save_filepath)
 
         self.controller.set_current_patient(patient)
         self.controller.show_patient_diagnosis_split()
@@ -234,33 +243,141 @@ class PatientDataInputWindow(tk.Toplevel):
         self.grab_release()
         self.destroy()
 
-class DiagnosesInputWindow(ttk.Frame):
-    def __init__(self, parent, controller):
+class DiagnosesInputWindow(tk.Toplevel):
+    def __init__(self, parent, controller, new_diagnosis=True):
         super().__init__(parent)
+        self.grab_set() # Prevent other interactions until window is closed 
 
-        self.title = ttk.Label(self, text="Diagnosis Data", font=TITLE_FONT)
-        self.title.grid(row=0, sticky="nsew", padx=10, pady=10)
+        """ Window size and placement """
+        screen_width = self.winfo_screenwidth()
+        screen_height = self.winfo_screenheight()
 
-        PRIMARY_DIAGNOSIS_VALUES = ["Unknown", "Stage 1", "Stage 2A", "Stage 2B", "Stage 3", "Stage 4", "Stage 4S"]
-        self.primary_diagnosis = LabeledDropdown(self, controller, label_text="Primary Diagnosis", dropdown_values=PRIMARY_DIAGNOSIS_VALUES)
+        window_width = 450
+        window_height = 850
 
-        self.primary_site = LabeledEntry(self, controller, label_text="Primary Site")
-        self.primary_site.grid(row=1, column=0, padx=10, pady=10, sticky="w")
+        placement_x, placement_y = get_window_placement(screen_width, screen_height, window_width, window_height)
 
-        self.tissue_organ_origin = LabeledEntry(self, controller, label_text="Tissue or Organ of Origin")
-        self.tissue_organ_origin.grid(row=1, column=1, padx=10, pady=10, sticky="w")
+        self.geometry("{}x{}+{}+{}".format(window_width, window_height, placement_x, placement_y))
 
+        """ Title label """
+
+        self.container = ttk.Frame(self)
+        self.container.pack(fill="both", expand=True)
+
+        self.title = ttk.Label(self.container, text="Diagnosis Data", font=TITLE_FONT)
+        self.title.pack(anchor="w")
+
+        """ Load in Encoded Labels """
+        encoded_labels = load_encoded_labels(ENCODED_LABELS_FILEPATH)
+
+        encoded_labels["cases.primary_site"]
+
+        PRIMARY_SITE_VALUES = encoded_labels["cases.primary_site"]
+        PRIMARY_SITE_VALUES.insert(0, "Unknown")
+        primary_site_width = len(max(PRIMARY_SITE_VALUES, key=len))
+
+        PRIMARY_DIAGNOSIS_VALUES = encoded_labels["diagnoses.primary_diagnosis"]
+        PRIMARY_DIAGNOSIS_VALUES.insert(0, "Unknown")
+
+        TISSUE_OR_ORGAN_ORIGIN_VALUES = encoded_labels["diagnoses.tissue_or_organ_of_origin"]
+        TISSUE_OR_ORGAN_ORIGIN_VALUES.insert(0, "Unknown")
+
+        TREATMENT_VALUES = encoded_labels["treatments.protocol_identifier"]
+        TREATMENT_VALUES.insert(0, "Unknown")
+        
         INSS_STAGE_VALUES = ["Unknown", "Stage 1", "Stage 2A", "Stage 2B", "Stage 3", "Stage 4", "Stage 4S"]
-        self.inss_stage = LabeledDropdown(self, controller, label_text="INSS Stage", dropdown_values=INSS_STAGE_VALUES)
-        self.inss_stage.grid(row=2, column=0, padx=10, pady=10, sticky="w")
-
+        INPC_GRADE_VALUES = ["Unknown", "Undifferentiated or Poorly Differentiated", "Differentiating"]
         COG_NBL_RISK_GROUP_VALUES = ["Unknown", "Low Risk", "Intermediate Risk", "High Risk"]
-        self.cog_nbl_risk_group = LabeledDropdown(self, controller, label_text="COG Risk Group", dropdown_values=COG_NBL_RISK_GROUP_VALUES)
-        self.cog_nbl_risk_group.grid(row=2, column=1, padx=10, pady=10, sticky="w")
-
         MKI_VALUES = ["Unknown", "Low", "Intermediate", "High"]
-        self.mki = LabeledDropdown(self, controller, label_text="Mitosis Karyorrhexis Index", dropdown_values=MKI_VALUES)
-        self.mki.grid(row=3, column=0, padx=10, pady=10)
+
+        ICD_10_VALUES = encoded_labels["diagnoses.icd_10_code"]
+        ICD_10_VALUES.insert(0, "Unknown")
+
+        MOLECULAR_TEST_RESULT_VALUES = ["Unknown", "Abnormal", "Amplified", "Normal", "Not Amplified"]
+        MOLECULAR_TEST_PLOIDY_VALUES = ["Unknown", "Diploid", "Hyperdiploid"]
+
+        self.date = LabeledCalendar(self.container, controller, "Date of Diagnoses")
+        self.date.pack(side="top", fill="x", padx=10, pady=10)
+
+        self.primary_diagnosis = LabeledDropdown(self.container, controller, label_text="Primary Diagnosis", dropdown_values=PRIMARY_DIAGNOSIS_VALUES, width=primary_site_width)
+        self.primary_diagnosis.pack(anchor="w", padx=10, pady=5)
+
+        # TODO will need to allow manual input
+        self.icd10 = LabeledDropdown(self.container, controller, label_text="ICD-10 Code", dropdown_values=ICD_10_VALUES, width=primary_site_width)
+        self.icd10.pack(anchor="w", padx=10, pady=5)
+
+        # TODO will need to allow individual inputs of treatments
+        self.treatment_protocols = LabeledDropdown(self.container, controller, label_text="Treatment Protocols", dropdown_values=TREATMENT_VALUES, width=primary_site_width)
+        self.treatment_protocols.pack(anchor="w", padx=10, pady=5)
+
+        self.primary_site = LabeledDropdown(self.container, controller, label_text="Primary Site", dropdown_values=PRIMARY_SITE_VALUES, width=primary_site_width)
+        self.primary_site.pack(anchor="w", padx=10, pady=5)
+
+        self.tissue_organ_origin = LabeledDropdown(self.container, controller, label_text="Tissue/Organ of Origin", dropdown_values=TISSUE_OR_ORGAN_ORIGIN_VALUES, width=primary_site_width)
+        self.tissue_organ_origin.pack(anchor="w", padx=10, pady=5)
+
+        self.inss_stage = LabeledDropdown(self.container, controller, label_text="INSS Stage", dropdown_values=INSS_STAGE_VALUES, width=primary_site_width)
+        self.inss_stage.pack(anchor="w", padx=10, pady=5)
+
+        self.inpc_grade = LabeledDropdown(self.container, controller, label_text="INPC Grade", dropdown_values=INPC_GRADE_VALUES, width=primary_site_width)
+        self.inpc_grade.pack(anchor="w", padx=10, pady=5)
+
+        self.cog_nbl_risk_group = LabeledDropdown(self.container, controller, label_text="COG Risk Group", dropdown_values=COG_NBL_RISK_GROUP_VALUES, width=primary_site_width)
+        self.cog_nbl_risk_group.pack(anchor="w", padx=10, pady=5)
+
+        self.mki = LabeledDropdown(self.container, controller, label_text="Mitosis Karyorrhexis Index", dropdown_values=MKI_VALUES, width=primary_site_width)
+        self.mki.pack(anchor="w", padx=10, pady=5)
+
+        self.molecular_test_result = LabeledDropdown(self.container, controller, label_text="MYCN Molecular Test Result", dropdown_values=MOLECULAR_TEST_RESULT_VALUES, width=primary_site_width)
+        self.molecular_test_result.pack(anchor="w", padx=10, pady=5)
+
+        self.molecular_test_ploidy = LabeledDropdown(self.container, controller, label_text="Molecular Test Ploidy", dropdown_values=MOLECULAR_TEST_PLOIDY_VALUES, width=primary_site_width)
+        self.molecular_test_ploidy.pack(anchor="w", padx=10, pady=5)
+        
+        self.pathology_necrosis_percent = LabeledEntry(self.container, controller, label_text="Pathology Necrosis Percent")
+        self.pathology_necrosis_percent.pack(anchor="w", padx=10, pady=5)
+
+        self.pathology_percent_tumor_nuclei = LabeledEntry(self.container, controller, label_text="Pathology Percent Tumor Nuclei")
+        self.pathology_percent_tumor_nuclei.pack(anchor="w", padx=10, pady=5)
+
+        self.save_button = ttk.Button(self, text="Save", command=self.save_callback)
+        self.save_button.pack(side="left", padx=10, pady=5)
+
+        self.cancel_button = ttk.Button(self, text="Cancel", command=self.cancel_callback)
+        self.cancel_button.pack(side="left", padx=10, pady=5)
+
+    def save_callback(self):
+
+        diagnosis = Diagnosis()
+
+        month, day, year = self.date.get_date()
+
+        diagnosis.date_month = month
+        diagnosis.date_day = day
+        diagnosis.date_year = year
+
+        diagnosis.primary_diagnosis = self.primary_diagnosis.get()
+        diagnosis.icd_10_code = self.icd10.get()
+        diagnosis.treatment_protocols = self.treatment_protocols.get()
+        diagnosis.primary_site = self.primary_site.get()
+
+        diagnosis.inss_stage = self.inss_stage.get()
+        diagnosis.inpc_grade = self.inpc_grade.get()
+        diagnosis.cog_risk_group = self.cog_nbl_risk_group.get()
+
+        diagnosis.mki = self.mki.get()
+        diagnosis.molecular_test_result = self.molecular_test_result.get()
+        diagnosis.molecular_test_ploidy = self.molecular_test_ploidy.get()
+
+        diagnosis.pathology_necrosis_percent = self.pathology_necrosis_percent.get()
+        diagnosis.pathology_percent_tumor_nuclei = self.pathology_percent_tumor_nuclei.get()
+
+        self.grab_release()
+        self.destroy()
+
+    def cancel_callback(self):
+        self.grab_release()
+        self.destroy()
 
 class PlotFrame(ttk.Frame):
     def __init__(self, parent, controller):
@@ -281,18 +398,25 @@ class PatientSelectFrame(ttk.Frame):
         self.new_patient_button = ttk.Button(self, text="Add New Data", padding=10, width=20, command=self.new_patient_callback)
         self.new_patient_button.pack(pady=5)
 
-        # self.load_patient_button = ttk.Button(self, text="Load Patient", padding=10, width=20)
-        # self.load_patient_button.pack(pady=5)
+        self.load_patient_button = ttk.Button(self, text="Load Patient", padding=10, width=20, command=self.load_patient_callback)
+        self.load_patient_button.pack(pady=5)
 
     def new_patient_callback(self):
-        patient_info_window = PatientDataInputWindow(self, self.controller)
+        patient_input_window = PatientDataInputWindow(self, self.controller)
+
+    def load_patient_callback(self):
+        filepath = filedialog.askopenfilename(parent=self, filetypes=[PATIENT_SAVE_FILETYPE], defaultextension=".json")
+        patient = load_patient_data(filepath)
+
+        self.controller.set_current_patient(patient)
+        self.controller.show_patient_diagnosis_split()
 
 class PatientInfoFrame(ttk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
 
         self.title_label = ttk.Label(self, text="Patient Information", font=TITLE_FONT)
-        self.title_label.pack(anchor="w", padx=10, pady=10)
+        self.title_label.pack(anchor="center", padx=10, pady=10)
 
         patient = controller.get_current_patient()
 
@@ -306,7 +430,7 @@ class PatientInfoFrame(ttk.Frame):
         date_of_birth_str = "Date of Birth: {} {}, {}".format(birth_month, patient.birth_day, patient.birth_year)
 
         self.edit_button = ttk.Button(self, text="Edit")
-        self.edit_button.pack(anchor="w", padx=10)
+        self.edit_button.pack(anchor="center", padx=10)
 
         self.name = ttk.Label(self, text=name_str, font=H1_FONT)
         self.name.pack(anchor="w", padx=10, pady=10)
@@ -327,15 +451,24 @@ class DiagnosesInfoFrame(ttk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
 
+        self.controller = controller
+
         self.title_label = ttk.Label(self, text="Diagnoses", font=TITLE_FONT)
-        self.title_label.pack(anchor="w", padx=10, pady=10)
+        self.title_label.pack(anchor="center", padx=10, pady=10)
+
+        self.add_button = ttk.Button(self, text="Add Entry", command=self.add_button_callback)
+        self.add_button.pack()
+
+    def add_button_callback(self):
+        diagnosis_input_window = DiagnosesInputWindow(self, self.controller)
 
 class GuiRoot(tk.Tk):
     def __init__(self):
         super().__init__()
         
         self.current_patient = None
-        
+        self.patient_filepath = None
+
         self.title(WINDOW_TITLE)
 
         screen_width = self.winfo_screenwidth()
@@ -410,6 +543,6 @@ class GuiRoot(tk.Tk):
 
 if __name__ == "__main__":
     test_root = tk.Tk()
-    window = PatientDataInputWindow(test_root, test_root) 
+    window = DiagnosesInputWindow(test_root, test_root)
 
     test_root.mainloop()
