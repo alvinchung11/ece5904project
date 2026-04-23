@@ -1,7 +1,17 @@
-from dataclasses import dataclass, field, asdict
-import json
+# Classes to hold patient data
 
-# Class to hold patient data
+from dataclasses import dataclass, field, asdict
+from datetime import date
+import json
+import numpy as np
+
+FEATURE_VECTOR_LENGTH = 34
+
+ENCODED_LABELS_FILEPATH = "../data/encoded_labels.json"
+
+COG_RISK_ENCODING = {"Unknown":0.0, "Low Risk":1, "Intermediate Risk":2, "High Risk":3}
+INSS_STAGE_ENCODING = {"Unknown":0.0, "Stage 1":1, "Stage 2A":2, "Stage 2B":3, "Stage 3":4, "Stage 4":5, "Stage 4S": 6}
+MKI_ENCODING = {"Unknown":0.0, "Low":1, "Intermediate":2, "High":3}
 
 @dataclass
 class Diagnosis:
@@ -47,6 +57,139 @@ class Patient:
     def get_diagnosis_asdict(self):
         return asdict(self.diagnosis)
 
+    def get_feature_vector(self):
+        feature_vector = np.zeros(FEATURE_VECTOR_LENGTH)
+        
+        encoded_labels = load_encoded_labels()
+
+        feature_vector[0] = encoded_labels["cases.primary_site"].index(self.diagnosis.primary_site)
+
+        patient_birth = date(self.birth_year, self.birth_month, self.birth_day)
+        diagnosis_date = date(self.diagnosis.date_year, self.diagnosis.date_month, self.diagnosis.date_day)
+        diff = diagnosis_date - patient_birth
+        age_at_diagnosis = diff.days
+
+        feature_vector[1] = age_at_diagnosis
+
+        feature_vector[2] = COG_RISK_ENCODING[self.diagnosis.cog_risk_group]
+        feature_vector[3] = encoded_labels["diagnoses.icd_10_code"].index(self.diagnosis.icd_10_code)
+        feature_vector[4] = INSS_STAGE_ENCODING[self.diagnosis.inss_stage]
+        feature_vector[5] = MKI_ENCODING[self.diagnosis.mki]
+        feature_vector[6] = encoded_labels["diagnoses.primary_diagnosis"].index(self.diagnosis.primary_diagnosis)
+        feature_vector[7] = encoded_labels["diagnoses.tissue_or_organ_of_origin"].index(self.diagnosis.tissue_organ_origin)
+        feature_vector[8] = encoded_labels["treatments.protocol_identifier"].index(self.diagnosis.treatment_protocols)
+
+        match self.gender:
+            case "Female":
+                feature_vector[9] = 1.0
+            case "Male":
+                feature_vector[10] = 1.0
+            case _:
+                feature_vector[11] = 1.0
+
+        match self.ethnicity:
+            case "Hispanic or Latino":
+                feature_vector[12] = 1.0
+            case "Not Hispanic or Latino":
+                feature_vector[13] = 1.0
+            case _:
+                feature_vector[14] = 1.0
+
+        match self.race:
+            case "Native American":
+                feature_vector[15] = 1.0
+            case "Asian":
+                feature_vector[16] = 1.0
+            case "Black":
+                feature_vector[17] = 1.0
+            case "Pacific Islander":
+                feature_vector[18] = 1.0
+            case "White":
+                feature_vector[19] = 1.0
+            case _:
+                feature_vector[20] = 1.0
+
+        match self.diagnosis.inpc_grade:
+            case "Differentiating":
+                feature_vector[21] = 1.0
+            case "Undifferentiated or Poorly Differentiated":
+                feature_vector[22] = 1.0
+            case _:
+                feature_vector[23] = 1.0
+
+        match self.diagnosis.molecular_test_ploidy:
+            case "Diploid":
+                feature_vector[24] = 1.0
+            case "Hyperdiploid":
+                feature_vector[25] = 1.0
+            case _:
+                feature_vector[26] = 1.0
+
+        match self.diagnosis.molecular_test_result:
+            case "Abnormal":
+                feature_vector[27] = 1.0
+            case "Amplified":
+                feature_vector[28] = 1.0
+            case "Normal":
+                feature_vector[29] = 1.0
+            case "Not Amplified":
+                feature_vector[30] = 1.0
+            case _:
+                feature_vector[31] = 1.0
+
+        feature_vector[32] = self.diagnosis.pathology_necrosis_percent
+        feature_vector[33] = self.diagnosis.pathology_percent_tumor_nuclei
+
+        # Add batch dimension
+        feature_vector = np.expand_dims(feature_vector, axis=0)
+
+        return feature_vector
+
+        """
+        Ordering
+        0 'cases.primary_site',
+        1 'diagnoses.age_at_diagnosis',
+        2 'diagnoses.cog_neuroblastoma_risk_group',
+        3 'diagnoses.icd_10_code',
+        4 'diagnoses.inss_stage',
+        5 'diagnoses.mitosis_karyorrhexis_index',
+        6 'diagnoses.primary_diagnosis',
+        7 'diagnoses.tissue_or_organ_of_origin',
+        8 'treatments.protocol_identifier',
+
+        9 'demographic.gender_female',
+        10 'demographic.gender_male',
+        11 'demographic.gender_nan',
+
+        12 'demographic.ethnicity_hispanic or latino',
+        13 'demographic.ethnicity_not hispanic or latino',
+        14 'demographic.ethnicity_nan',
+
+        15 'demographic.race_american indian or alaska native',
+        16 'demographic.race_asian',
+        17 'demographic.race_black or african american',
+        18 'demographic.race_native hawaiian or other pacific islander',
+        19 'demographic.race_white',
+        20 'demographic.race_nan',
+
+        21 'diagnoses.inpc_grade_Differentiating',
+        22 'diagnoses.inpc_grade_Undifferentiated or Poorly Differentiated',
+        23 'diagnoses.inpc_grade_nan',
+        
+        24 'molecular_tests.ploidy_Diploid',
+        25 'molecular_tests.ploidy_Hyperdiploid',
+        26 'molecular_tests.ploidy_nan',
+
+        27 'molecular_tests.test_result_Abnormal, NOS',
+        28 'molecular_tests.test_result_Amplified',
+        29 'molecular_tests.test_result_Normal',
+        30 'molecular_tests.test_result_Not Amplified',
+        31 'molecular_tests.test_result_nan',
+
+        32 'pathology_details.necrosis_percent',
+        33 'pathology_details.percent_tumor_nuclei',
+        """
+
 def save_patient_data(patient, filepath):
     file = open(filepath, "w")
     patient_dict = asdict(patient)
@@ -64,7 +207,8 @@ def load_patient_data(filepath):
 
     return patient
 
-def load_encoded_labels(filepath):
+def load_encoded_labels(filepath=ENCODED_LABELS_FILEPATH):
+
     file = open(filepath, "r")
     data = json.load(file)
 

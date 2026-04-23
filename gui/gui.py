@@ -1,12 +1,19 @@
 import tkinter as tk
 from tkinter import ttk, filedialog
-from matplotlib import pyplot as plt
 from datetime import date
 import calendar
 
 from patient_data import Patient
 from patient_data import Diagnosis
 from patient_data import save_patient_data, load_patient_data, load_encoded_labels
+
+from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+from matplotlib.figure import Figure
+
+import joblib
+
+from sksurv.linear_model import CoxPHSurvivalAnalysis
+from sksurv.ensemble import RandomSurvivalForest
 
 WINDOW_TITLE = "System Name"
 TITLE_FONT = ("TkDefaultFont", 24)
@@ -287,7 +294,7 @@ class DiagnosesInputWindow(tk.Toplevel):
         self.title.pack(anchor="w")
 
         """ Load in Encoded Labels """
-        encoded_labels = load_encoded_labels(ENCODED_LABELS_FILEPATH)
+        encoded_labels = load_encoded_labels()
 
         encoded_labels["cases.primary_site"]
 
@@ -405,13 +412,6 @@ class DiagnosesInputWindow(tk.Toplevel):
     def cancel_callback(self):
         self.grab_release()
         self.destroy()
-
-class PlotFrame(ttk.Frame):
-    def __init__(self, parent, controller):
-        super().__init__(parent)
-
-        self.title = ttk.Label(self, text="Plot Data", font=TITLE_FONT)
-        self.title.pack()
 
 class PatientSelectFrame(ttk.Frame):
     def __init__(self, parent, controller):
@@ -565,6 +565,67 @@ class DiagnosesInfoFrame(ttk.Frame):
         self.pathology_percent_tumor_nuclei = ttk.Label(self, text=pathology_percent_tumor_nuclei_str, font=H2_FONT)
         self.pathology_percent_tumor_nuclei.pack(anchor="w", padx=10, pady=5)
 
+class PlotFrame(ttk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+
+        self.controller = controller
+
+        self.title = ttk.Label(self, text="Plot Data", font=TITLE_FONT)
+        self.title.pack()
+
+        self.create_plot_button = ttk.Button(self, text="Create Plot from Data", command=self.create_plot)
+        self.create_plot_button.pack(anchor="center", pady=10)
+
+        self.fig = Figure(figsize=(5, 4))
+        self.plot_ax = self.fig.add_subplot()
+
+        self.canvas = FigureCanvasTkAgg(self.fig, self)
+        self.canvas_widget = self.canvas.get_tk_widget()
+
+
+        # self.test_notebook = ttk.Notebook(self.container)
+        # self.test_notebook.pack(fill="both", expand=True)
+
+        # self.patient_data.grid(row=0, column=0)
+        # self.test_notebook.add(self.patient_data, text="Patient Information")
+        # self.test_notebook.add(self.diagnoses_data, text="Diagnosis Information")
+        # self.test_notebook.add(self.test_plot, text="Test Plot")
+
+    def create_plot(self):
+        patient = self.controller.get_current_patient()
+
+        if(patient == None):
+            return
+        self.create_plot_button.pack_forget()
+        
+        feature_vector = patient.get_feature_vector()
+        
+        # TODO Move this logic to a separate module
+        coxPH_model : CoxPHSurvivalAnalysis = joblib.load("../models/model_coxPH.joblib")
+        RSF_model : RandomSurvivalForest = joblib.load("../models/model_RSF.joblib")
+
+        surv_func = RSF_model.predict_survival_function(feature_vector)
+
+        self.canvas_widget.pack(fill="both", expand=True)
+        
+        self.plot_ax.set_title("Relapse-Free Probability Over Time")
+
+        for fn in surv_func:
+                self.plot_ax.step(fn.x, fn(fn.x), where="post")
+        
+        self.plot_ax.set_xlabel("Months")
+        self.plot_ax.set_ylabel("Probability of No Relapse", size=12)
+        self.plot_ax.set_xlim([0, 24])
+        self.plot_ax.set_xticks(list(range(0, 25, 2)))
+        self.plot_ax.grid(True)
+
+class ChatFrame(ttk.Frame):
+    def __init__(self, parent, controller):
+        super().__init__(parent)
+
+        self.title = ttk.Label(self, text="Chat", font=TITLE_FONT)
+        self.title.pack()
 
 class GuiRoot(tk.Tk):
     def __init__(self):
@@ -613,19 +674,11 @@ class GuiRoot(tk.Tk):
         self.main_hor_pane.add(self.right_vert_pane, weight=5)
 
         # Frames within right side
-        self.test_plot = PlotFrame(self.right_vert_pane, self)
-        self.right_vert_pane.add(self.test_plot, weight=5)
+        self.plots = PlotFrame(self.right_vert_pane, self)
+        self.right_vert_pane.add(self.plots, weight=3)
         
-        # self.diagnoses_data = DiagnosesInputFrame(self.righ_vert_pane, self)
-        # self.righ_vert_pane.add(self.diagnoses_data, weight=1)
-
-        # self.test_notebook = ttk.Notebook(self.container)
-        # self.test_notebook.pack(fill="both", expand=True)
-
-        # self.patient_data.grid(row=0, column=0)
-        # self.test_notebook.add(self.patient_data, text="Patient Information")
-        # self.test_notebook.add(self.diagnoses_data, text="Diagnosis Information")
-        # self.test_notebook.add(self.test_plot, text="Test Plot")
+        self.chat = ChatFrame(self.right_vert_pane, self)
+        self.right_vert_pane.add(self.chat, weight=1)
 
     def show_patient_diagnosis_split(self):
         self.patient_select.pack_forget()
