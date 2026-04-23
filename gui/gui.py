@@ -11,6 +11,7 @@ from patient_data import save_patient_data, load_patient_data, load_encoded_labe
 WINDOW_TITLE = "System Name"
 TITLE_FONT = ("TkDefaultFont", 24)
 H1_FONT = ("TkDefaultFont", 12)
+H2_FONT = ("TkDefaultFont", 10)
 
 MONTH_VALUES = list(range(1,12+1))
 EARLIEST_YEAR = 1970
@@ -55,6 +56,20 @@ class LabeledDropdown(ttk.Frame):
 
     def get(self):
         return self.combo.get()
+    
+class LabeledSpinbox(ttk.Frame):
+    def __init__(self, parent, controller, label_text, min, max, width=None):
+        super().__init__(parent)
+
+        self.label = ttk.Label(self, text=label_text, font="")
+        self.label.pack(side="top", anchor="w")
+
+        self.spin = ttk.Spinbox(self, from_=min, to=max, width=width)
+        self.spin.set(min)
+        self.spin.pack(side="top", anchor="w")
+
+    def get(self):
+        return self.spin.get()
 
 class LabeledCalendar(ttk.Frame):
     def __init__(self, parent, controller, label_text, initial_month=None, initial_day=None, initial_year=None):
@@ -233,6 +248,7 @@ class PatientDataInputWindow(tk.Toplevel):
         save_filepath = filedialog.asksaveasfilename(parent=self, filetypes=[PATIENT_SAVE_FILETYPE], defaultextension=".json", title="Save Patient Data")
         save_patient_data(patient, save_filepath)
 
+        self.controller.set_patient_filepath(save_filepath)
         self.controller.set_current_patient(patient)
         self.controller.show_patient_diagnosis_split()
 
@@ -247,6 +263,9 @@ class DiagnosesInputWindow(tk.Toplevel):
     def __init__(self, parent, controller, new_diagnosis=True):
         super().__init__(parent)
         self.grab_set() # Prevent other interactions until window is closed 
+
+        self.parent = parent
+        self.controller = controller
 
         """ Window size and placement """
         screen_width = self.winfo_screenwidth()
@@ -334,10 +353,10 @@ class DiagnosesInputWindow(tk.Toplevel):
         self.molecular_test_ploidy = LabeledDropdown(self.container, controller, label_text="Molecular Test Ploidy", dropdown_values=MOLECULAR_TEST_PLOIDY_VALUES, width=primary_site_width)
         self.molecular_test_ploidy.pack(anchor="w", padx=10, pady=5)
         
-        self.pathology_necrosis_percent = LabeledEntry(self.container, controller, label_text="Pathology Necrosis Percent")
+        self.pathology_necrosis_percent = LabeledSpinbox(self.container, controller, label_text="Pathology Necrosis Percent", min=0, max=100)
         self.pathology_necrosis_percent.pack(anchor="w", padx=10, pady=5)
 
-        self.pathology_percent_tumor_nuclei = LabeledEntry(self.container, controller, label_text="Pathology Percent Tumor Nuclei")
+        self.pathology_percent_tumor_nuclei = LabeledSpinbox(self.container, controller, label_text="Pathology Percent Tumor Nuclei", min=0, max=100)
         self.pathology_percent_tumor_nuclei.pack(anchor="w", padx=10, pady=5)
 
         self.save_button = ttk.Button(self, text="Save", command=self.save_callback)
@@ -347,7 +366,7 @@ class DiagnosesInputWindow(tk.Toplevel):
         self.cancel_button.pack(side="left", padx=10, pady=5)
 
     def save_callback(self):
-
+        # TODO Add checking for valid values
         diagnosis = Diagnosis()
 
         month, day, year = self.date.get_date()
@@ -359,7 +378,9 @@ class DiagnosesInputWindow(tk.Toplevel):
         diagnosis.primary_diagnosis = self.primary_diagnosis.get()
         diagnosis.icd_10_code = self.icd10.get()
         diagnosis.treatment_protocols = self.treatment_protocols.get()
+
         diagnosis.primary_site = self.primary_site.get()
+        diagnosis.tissue_organ_origin = self.tissue_organ_origin.get()
 
         diagnosis.inss_stage = self.inss_stage.get()
         diagnosis.inpc_grade = self.inpc_grade.get()
@@ -369,8 +390,14 @@ class DiagnosesInputWindow(tk.Toplevel):
         diagnosis.molecular_test_result = self.molecular_test_result.get()
         diagnosis.molecular_test_ploidy = self.molecular_test_ploidy.get()
 
-        diagnosis.pathology_necrosis_percent = self.pathology_necrosis_percent.get()
-        diagnosis.pathology_percent_tumor_nuclei = self.pathology_percent_tumor_nuclei.get()
+        diagnosis.pathology_necrosis_percent = float(self.pathology_necrosis_percent.get()) / 100.0
+        diagnosis.pathology_percent_tumor_nuclei = float(self.pathology_percent_tumor_nuclei.get()) / 100.0
+        
+        # Save to disk
+        self.controller.add_diagnosis(diagnosis)
+        
+        # Update display
+        self.parent.show_info()
 
         self.grab_release()
         self.destroy()
@@ -408,6 +435,7 @@ class PatientSelectFrame(ttk.Frame):
         filepath = filedialog.askopenfilename(parent=self, filetypes=[PATIENT_SAVE_FILETYPE], defaultextension=".json")
         patient = load_patient_data(filepath)
 
+        self.controller.set_patient_filepath(filepath)
         self.controller.set_current_patient(patient)
         self.controller.show_patient_diagnosis_split()
 
@@ -433,19 +461,19 @@ class PatientInfoFrame(ttk.Frame):
         self.edit_button.pack(anchor="center", padx=10)
 
         self.name = ttk.Label(self, text=name_str, font=H1_FONT)
-        self.name.pack(anchor="w", padx=10, pady=10)
+        self.name.pack(anchor="w", padx=10, pady=5)
 
-        self_date_of_birth = ttk.Label(self, text=date_of_birth_str, font=H1_FONT)
-        self_date_of_birth.pack(anchor="w", padx=10, pady=10)
+        self.date_of_birth = ttk.Label(self, text=date_of_birth_str, font=H1_FONT)
+        self.date_of_birth.pack(anchor="w", padx=10, pady=5)
 
         self.gender = ttk.Label(self, text=gender_str, font=H1_FONT)
-        self.gender.pack(anchor="w", padx=10, pady=10)
+        self.gender.pack(anchor="w", padx=10, pady=5)
 
         self.ethnicity = ttk.Label(self, text=ethnicity_str, font=H1_FONT)
-        self.ethnicity.pack(anchor="w", padx=10, pady=10)
+        self.ethnicity.pack(anchor="w", padx=10, pady=5)
 
         self.race = ttk.Label(self, text=race_str, font=H1_FONT)
-        self.race.pack(anchor="w", padx=10, pady=10)
+        self.race.pack(anchor="w", padx=10, pady=5)
 
 class DiagnosesInfoFrame(ttk.Frame):
     def __init__(self, parent, controller):
@@ -457,10 +485,86 @@ class DiagnosesInfoFrame(ttk.Frame):
         self.title_label.pack(anchor="center", padx=10, pady=10)
 
         self.add_button = ttk.Button(self, text="Add Entry", command=self.add_button_callback)
-        self.add_button.pack()
+        self.add_button.pack(anchor="center", padx=10)
+
+        if(self.controller.get_current_patient().diagnosis != None):
+            self.show_info()
 
     def add_button_callback(self):
         diagnosis_input_window = DiagnosesInputWindow(self, self.controller)
+    
+    def show_info(self):
+        self.add_button.pack_forget()
+
+        patient = self.controller.get_current_patient()
+        diagnosis = patient.diagnosis
+
+        month = calendar.month_name[diagnosis.date_month]
+        day = diagnosis.date_day
+        year = diagnosis.date_year
+
+        primary_diagnosis_str = "Primary Diagnosis: {}".format(diagnosis.primary_diagnosis)
+        icd_10_code_str = "ICD-10 Code: {}".format(diagnosis.icd_10_code)
+        treatment_protocols_str = "Treatment Protocol IDs:\n{}".format(diagnosis.treatment_protocols)
+
+        primary_site_str = "Primary Site: {}".format(diagnosis.primary_site)
+        tissue_organ_origin_str = "Tissue/Organ of Origin: {}".format(diagnosis.tissue_organ_origin)
+
+        inss_stage_str = "INSS Stage: {}".format(diagnosis.inss_stage)
+        inpc_grade_str = "INPC Grade: {}".format(diagnosis.inpc_grade)
+        cog_risk_group_str = "COG Neuroblastoma Risk Group: {}".format(diagnosis.cog_risk_group)
+
+        mki_str = "Mitosis Karyorrhexis Index: {}".format(diagnosis.mki)
+
+        molecular_test_result_str = "Molecular Test Result (MYCN Gene): {}".format(diagnosis.molecular_test_result)
+        molecular_test_ploidy_str = "Molecular Test Ploidy: {}".format(diagnosis.molecular_test_ploidy)
+
+        pathology_necrosis_percent_str = "Pathology Necrosis Percent: {}%".format(diagnosis.pathology_necrosis_percent * 100)
+        pathology_percent_tumor_nuclei_str = "Pathology Percent Tumor Nuclei: {}%".format(diagnosis.pathology_necrosis_percent * 100)
+
+        date_str = "Date of Record: {} {}, {}".format(month, day, year)
+        self.date = ttk.Label(self, text=date_str, font=H2_FONT)
+        self.date.pack(anchor="w", padx=10, pady=5)
+
+        self.primary_diagnosis = ttk.Label(self, text=primary_diagnosis_str, font=H2_FONT)
+        self.primary_diagnosis.pack(anchor="w", padx=10, pady=5)
+
+        self.icd10 = ttk.Label(self, text=icd_10_code_str, font=H2_FONT)
+        self.icd10.pack(anchor="w", padx=10, pady=5)
+        
+        self.treatments = ttk.Label(self, text=treatment_protocols_str, font=H2_FONT, wraplength=300)
+        self.treatments.pack(anchor="w", padx=10, pady=5)
+
+        self.primary_site = ttk.Label(self, text=primary_site_str, font=H2_FONT, wraplength=300)
+        self.primary_site.pack(anchor="w", padx=10, pady=5)
+
+        self.tissue_organ_origin = ttk.Label(self, text=tissue_organ_origin_str, font=H2_FONT, wraplength=300)
+        self.tissue_organ_origin.pack(anchor="w", padx=10, pady=5)
+
+        self.inss_stage = ttk.Label(self, text=inss_stage_str, font=H2_FONT)
+        self.inss_stage.pack(anchor="w", padx=10, pady=5)
+
+        self.inpc_grade = ttk.Label(self, text=inpc_grade_str, font=H2_FONT)
+        self.inpc_grade.pack(anchor="w", padx=10, pady=5)
+
+        self.cog_risk_group = ttk.Label(self, text=cog_risk_group_str, font=H2_FONT)
+        self.cog_risk_group.pack(anchor="w", padx=10, pady=5)
+
+        self.mki = ttk.Label(self, text=mki_str, font=H2_FONT)
+        self.mki.pack(anchor="w", padx=10, pady=5)
+
+        self.molecular_test_result = ttk.Label(self, text=molecular_test_result_str, font=H2_FONT)
+        self.molecular_test_result.pack(anchor="w", padx=10, pady=5)
+
+        self.molecular_test_ploidy = ttk.Label(self, text=molecular_test_ploidy_str, font=H2_FONT)
+        self.molecular_test_ploidy.pack(anchor="w", padx=10, pady=5)
+
+        self.pathology_necrosis_percent = ttk.Label(self, text=pathology_necrosis_percent_str, font=H2_FONT)
+        self.pathology_necrosis_percent.pack(anchor="w", padx=10, pady=5)
+
+        self.pathology_percent_tumor_nuclei = ttk.Label(self, text=pathology_percent_tumor_nuclei_str, font=H2_FONT)
+        self.pathology_percent_tumor_nuclei.pack(anchor="w", padx=10, pady=5)
+
 
 class GuiRoot(tk.Tk):
     def __init__(self):
@@ -540,6 +644,16 @@ class GuiRoot(tk.Tk):
 
     def get_current_patient(self):
         return self.current_patient
+    
+    def set_patient_filepath(self, filepath):
+        self.patient_filepath = filepath
+
+    def get_patient_filepath(self, filepath):
+        return self.patient_filepath
+
+    def add_diagnosis(self, diagnosis):
+        self.current_patient.diagnosis = diagnosis
+        save_patient_data(self.current_patient, self.patient_filepath)
 
 if __name__ == "__main__":
     test_root = tk.Tk()

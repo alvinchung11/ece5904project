@@ -44,6 +44,9 @@ class Patient:
     diagnosis : Diagnosis = None
     # diagnoses : list[Diagnosis] = field(default_factory=list)
 
+    def get_diagnosis_asdict(self):
+        return asdict(self.diagnosis)
+
 def save_patient_data(patient, filepath):
     file = open(filepath, "w")
     patient_dict = asdict(patient)
@@ -55,6 +58,9 @@ def load_patient_data(filepath):
     data = json.load(file)
 
     patient = Patient(**data)
+
+    if(patient.diagnosis != None):
+        patient.diagnosis = Diagnosis(**patient.diagnosis)
 
     return patient
 
