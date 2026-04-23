@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, filedialog
+from tkinter import ttk, filedialog, scrolledtext
 from datetime import date
 import calendar
 
@@ -15,10 +15,15 @@ import joblib
 from sksurv.linear_model import CoxPHSurvivalAnalysis
 from sksurv.ensemble import RandomSurvivalForest
 
+import threading
+import ollama
+
 WINDOW_TITLE = "System Name"
 TITLE_FONT = ("TkDefaultFont", 24)
 H1_FONT = ("TkDefaultFont", 12)
 H2_FONT = ("TkDefaultFont", 10)
+CHAT_FONT = ("TkDefaultFont", 15)
+
 
 MONTH_VALUES = list(range(1,12+1))
 EARLIEST_YEAR = 1970
@@ -623,9 +628,38 @@ class PlotFrame(ttk.Frame):
 class ChatFrame(ttk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
-
+        
         self.title = ttk.Label(self, text="Chat", font=TITLE_FONT)
         self.title.pack()
+
+        self.textArea = scrolledtext.ScrolledText(self, wrap=tk.WORD, state="disabled", height=10, font=CHAT_FONT)
+        self.textArea.pack(fill="x", padx=10, pady=10)
+
+        self.entry = ttk.Entry(self)
+        self.entry.bind("<Return>", self.send_chat)
+        self.entry.pack(fill="x", padx=10, pady=10)
+
+    def update_text(self, message):
+        self.textArea.configure(state="normal")
+        self.textArea.insert(tk.END, message + "\n")
+        self.textArea.configure(state="disabled")
+
+    def send_chat(self, event):
+        message = self.entry.get()
+        self.entry.delete(0, tk.END)
+        self.update_text(">> {}".format(message))
+        self.textArea.see(tk.END)
+
+        llm_thread = threading.Thread(target=self.call_llm, args=[message])
+        llm_thread.start()
+        
+    def call_llm(self, message):
+        response = ollama.chat(model="medgemma",
+                               messages=[{"role": "user", "content": message}])
+
+        llm_message = response.message.content
+
+        self.after(0, self.update_text, llm_message)
 
 class GuiRoot(tk.Tk):
     def __init__(self):
@@ -675,10 +709,15 @@ class GuiRoot(tk.Tk):
 
         # Frames within right side
         self.plots = PlotFrame(self.right_vert_pane, self)
-        self.right_vert_pane.add(self.plots, weight=3)
+        self.right_vert_pane.add(self.plots, weight=0)
         
         self.chat = ChatFrame(self.right_vert_pane, self)
-        self.right_vert_pane.add(self.chat, weight=1)
+        self.right_vert_pane.add(self.chat, weight=0)
+
+        self.right_vert_pane.pane(0, weight=4)
+
+        self.main_hor_pane.pane(0, weight=3)
+        self.main_hor_pane.pane(1, weight=5)
 
     def show_patient_diagnosis_split(self):
         self.patient_select.pack_forget()
