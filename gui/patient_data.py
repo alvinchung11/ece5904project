@@ -4,6 +4,7 @@ from dataclasses import dataclass, field, asdict
 from datetime import date
 import json
 import numpy as np
+import calendar
 
 FEATURE_VECTOR_LENGTH = 34
 
@@ -37,6 +38,29 @@ class Diagnosis:
 
     pathology_necrosis_percent : float = 0.0
     pathology_percent_tumor_nuclei : float = 0.0
+
+    def get_diagnosis_in_english(self):
+        ret = "Record Date: {} {}, {} ".format(calendar.month_name[self.date_month], self.date_day, self.date_year)
+
+        ret += "Primary Diagnosis: {} ".format(self.primary_diagnosis)
+        ret += "ICD-10 Code: {} ".format(self.icd_10_code)
+        ret += "Treatment Protocols: {} ".format(self.treatment_protocols)
+
+        ret += "Primary Site: {} ".format(self.primary_site)
+        ret += "Tissue or Organ of Origin: {} ".format(self.tissue_organ_origin)
+
+        ret += "International Neuroblastoma Staging System (INSS) Stage: {} ".format(self.inss_stage)
+        ret += "International Neuroblastoma Pathology Classification (INPC) Grade: {} ".format(self.inpc_grade)
+        ret += "Children's Oncology Group (COG) Neuroblastoma Risk Group: {} ".format(self.cog_risk_group)
+        ret += "Mitosis Karyorrhexis Index (MKI): {} ".format(self.mki)
+
+        ret += "Molecular Test Result, MYCN Gene: {} ".format(self.molecular_test_result)
+        ret += "Molecular Test Ploidy: {} ".format(self.molecular_test_ploidy)
+
+        ret += "Sample Pathology Necrosis Percent: {} ".format(self.pathology_necrosis_percent)
+        ret += "Sample Pathology Percent Tumor Nuclei: {} ".format(self.pathology_percent_tumor_nuclei)
+
+        return ret
 
 @dataclass
 class Patient:
@@ -189,6 +213,19 @@ class Patient:
         32 'pathology_details.necrosis_percent',
         33 'pathology_details.percent_tumor_nuclei',
         """
+
+    def get_patient_data_in_english(self):
+        ret = "Patient Name: {} {} ".format(self.first_name, self.last_name)
+
+        ret += "Gender: {} ".format(self.gender)
+        ret += "Ethnicity: {} ".format(self.ethnicity)
+        ret += "Race: {} ".format(self.race)
+
+        ret += "Date of Birth: {} {}, {}".format(calendar.month_name[self.birth_month], self.birth_day, self.birth_year)
+
+        ret += "Diagnosis 1: [{}] ".format(self.diagnosis.get_diagnosis_in_english())
+
+        return ret
 
 def save_patient_data(patient, filepath):
     file = open(filepath, "w")

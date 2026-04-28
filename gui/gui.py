@@ -3,27 +3,22 @@ from tkinter import ttk, filedialog, scrolledtext
 from datetime import date
 import calendar
 
-from patient_data import Patient
-from patient_data import Diagnosis
+from patient_data import Patient, Diagnosis
 from patient_data import save_patient_data, load_patient_data, load_encoded_labels
 
-from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-from matplotlib.figure import Figure
-
-import joblib
-
-from sksurv.linear_model import CoxPHSurvivalAnalysis
-from sksurv.ensemble import RandomSurvivalForest
+from patient_plots import get_RSF_plot, get_CoxPH_plot
 
 import threading
 import ollama
+
+import json
 
 WINDOW_TITLE = "System Name"
 TITLE_FONT = ("TkDefaultFont", 24)
 H1_FONT = ("TkDefaultFont", 12)
 H2_FONT = ("TkDefaultFont", 10)
 CHAT_FONT = ("TkDefaultFont", 15)
-
+CHAT_ENTRY_FONT = ("TkDefaultFont", 15)
 
 MONTH_VALUES = list(range(1,12+1))
 EARLIEST_YEAR = 1970
@@ -501,6 +496,9 @@ class DiagnosesInfoFrame(ttk.Frame):
     def show_info(self):
         self.add_button.pack_forget()
 
+        self.edit_button = ttk.Button(self, text="Edit")
+        self.edit_button.pack(anchor="center", padx=10)
+
         patient = self.controller.get_current_patient()
         diagnosis = patient.diagnosis
 
@@ -525,7 +523,7 @@ class DiagnosesInfoFrame(ttk.Frame):
         molecular_test_ploidy_str = "Molecular Test Ploidy: {}".format(diagnosis.molecular_test_ploidy)
 
         pathology_necrosis_percent_str = "Pathology Necrosis Percent: {}%".format(diagnosis.pathology_necrosis_percent * 100)
-        pathology_percent_tumor_nuclei_str = "Pathology Percent Tumor Nuclei: {}%".format(diagnosis.pathology_necrosis_percent * 100)
+        pathology_percent_tumor_nuclei_str = "Pathology Percent Tumor Nuclei: {}%".format(diagnosis.pathology_percent_tumor_nuclei * 100)
 
         date_str = "Date of Record: {} {}, {}".format(month, day, year)
         self.date = ttk.Label(self, text=date_str, font=H2_FONT)
@@ -582,20 +580,7 @@ class PlotFrame(ttk.Frame):
         self.create_plot_button = ttk.Button(self, text="Create Plot from Data", command=self.create_plot)
         self.create_plot_button.pack(anchor="center", pady=10)
 
-        self.fig = Figure(figsize=(5, 4))
-        self.plot_ax = self.fig.add_subplot()
-
-        self.canvas = FigureCanvasTkAgg(self.fig, self)
-        self.canvas_widget = self.canvas.get_tk_widget()
-
-
-        # self.test_notebook = ttk.Notebook(self.container)
-        # self.test_notebook.pack(fill="both", expand=True)
-
-        # self.patient_data.grid(row=0, column=0)
-        # self.test_notebook.add(self.patient_data, text="Patient Information")
-        # self.test_notebook.add(self.diagnoses_data, text="Diagnosis Information")
-        # self.test_notebook.add(self.test_plot, text="Test Plot")
+        self.plots_notebook = ttk.Notebook(self)
 
     def create_plot(self):
         patient = self.controller.get_current_patient()
@@ -604,62 +589,70 @@ class PlotFrame(ttk.Frame):
             return
         self.create_plot_button.pack_forget()
         
+        self.plots_notebook.pack(fill="both", expand=True)
+
         feature_vector = patient.get_feature_vector()
         
-        # TODO Move this logic to a separate module
-        coxPH_model : CoxPHSurvivalAnalysis = joblib.load("../models/model_coxPH.joblib")
-        RSF_model : RandomSurvivalForest = joblib.load("../models/model_RSF.joblib")
+        self.RSF_plot = get_RSF_plot(self.plots_notebook, feature_vector)
+        self.plots_notebook.add(self.RSF_plot, text="RSF")
 
-        surv_func = RSF_model.predict_survival_function(feature_vector)
-
-        self.canvas_widget.pack(fill="both", expand=True)
-        
-        self.plot_ax.set_title("Relapse-Free Probability Over Time")
-
-        for fn in surv_func:
-                self.plot_ax.step(fn.x, fn(fn.x), where="post")
-        
-        self.plot_ax.set_xlabel("Months")
-        self.plot_ax.set_ylabel("Probability of No Relapse", size=12)
-        self.plot_ax.set_xlim([0, 24])
-        self.plot_ax.set_xticks(list(range(0, 25, 2)))
-        self.plot_ax.grid(True)
+        self.CoxPH_plot = get_CoxPH_plot(self.plots_notebook, feature_vector)
+        self.plots_notebook.add(self.CoxPH_plot, text="CoxPH")
 
 class ChatFrame(ttk.Frame):
     def __init__(self, parent, controller):
         super().__init__(parent)
         
+        self.controller = controller
+
         self.title = ttk.Label(self, text="Chat", font=TITLE_FONT)
         self.title.pack()
+
+        # TODO make sure this is disabled until a patient is loaded
+        self.use_patient_info_var = tk.IntVar()
+        self.use_patient_info_checkbox = ttk.Checkbutton(self, text="Include Patient Information with Message", variable=self.use_patient_info_var, onvalue=1, offvalue=0)
+        self.use_patient_info_checkbox.configure()
+        self.use_patient_info_checkbox.pack(anchor="w", padx=10)
 
         self.textArea = scrolledtext.ScrolledText(self, wrap=tk.WORD, state="disabled", height=10, font=CHAT_FONT)
         self.textArea.pack(fill="x", padx=10, pady=10)
 
-        self.entry = ttk.Entry(self)
+        self.entry = ttk.Entry(self, font=CHAT_ENTRY_FONT)
         self.entry.bind("<Return>", self.send_chat)
         self.entry.pack(fill="x", padx=10, pady=10)
 
     def update_text(self, message):
         self.textArea.configure(state="normal")
-        self.textArea.insert(tk.END, message + "\n")
+        self.textArea.insert(tk.END, message)
         self.textArea.configure(state="disabled")
+        self.textArea.see(tk.END)
 
     def send_chat(self, event):
         message = self.entry.get()
         self.entry.delete(0, tk.END)
-        self.update_text(">> {}".format(message))
+        self.update_text(">> {}\n".format(message))
         self.textArea.see(tk.END)
 
-        llm_thread = threading.Thread(target=self.call_llm, args=[message])
+        if self.use_patient_info_var.get():
+            patient = self.controller.get_current_patient()
+            message += (" " + patient.get_patient_data_in_english())
+
+        llm_thread = threading.Thread(target=self.call_llm, args=[message], daemon=True)
         llm_thread.start()
-        
+
+    # TODO move this to a separate module
     def call_llm(self, message):
-        response = ollama.chat(model="medgemma",
-                               messages=[{"role": "user", "content": message}])
+        stream = ollama.chat(model="medgemma", messages=[{"role": "user", "content": message}], stream=True)
 
-        llm_message = response.message.content
+        llm_message = ""
 
-        self.after(0, self.update_text, llm_message)
+        for chunk in stream:
+            content = chunk.message.content
+            llm_message += content
+
+            self.after(0, self.update_text, content)
+    
+        self.after(0, self.update_text, "\n")
 
 class GuiRoot(tk.Tk):
     def __init__(self):
