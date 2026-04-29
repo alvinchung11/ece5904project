@@ -6,7 +6,7 @@ import calendar
 from patient_data import Patient, Diagnosis
 from patient_data import save_patient_data, load_patient_data, load_encoded_labels
 
-from patient_plots import get_RSF_plot, get_CoxPH_plot
+from patient_plots import get_RSF_plot, get_CoxPH_plot, get_LTC_plot
 
 import threading
 import ollama
@@ -577,7 +577,7 @@ class PlotFrame(ttk.Frame):
         self.title = ttk.Label(self, text="Plot Data", font=TITLE_FONT)
         self.title.pack()
 
-        self.create_plot_button = ttk.Button(self, text="Create Plot from Data", command=self.create_plot)
+        self.create_plot_button = ttk.Button(self, text="Create Plots from Data", command=self.create_plot)
         self.create_plot_button.pack(anchor="center", pady=10)
 
         self.plots_notebook = ttk.Notebook(self)
@@ -598,6 +598,9 @@ class PlotFrame(ttk.Frame):
 
         self.CoxPH_plot = get_CoxPH_plot(self.plots_notebook, feature_vector)
         self.plots_notebook.add(self.CoxPH_plot, text="CoxPH")
+
+        self.LTC_plot = get_LTC_plot(self.plots_notebook, feature_vector)
+        self.plots_notebook.add(self.LTC_plot, text="LTC LNN")
 
 class ChatFrame(ttk.Frame):
     def __init__(self, parent, controller):

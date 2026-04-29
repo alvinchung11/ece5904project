@@ -1,2 +1,5 @@
 *.parquet
 *.npz
+*.pyc
+*.joblib
+*.pth
