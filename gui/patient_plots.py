@@ -14,7 +14,7 @@ from sksurv.ensemble import RandomSurvivalForest
 
 import joblib
 
-from ltc_lnn import get_ltc_model, get_single_ltc_prediction, load_ltc_weights
+from ltc_lnn import get_model, get_single_ltc_prediction, load_ltc_weights
 
 def get_RSF_plot(master, feature_vector):
     frame = ttk.Frame(master)
@@ -74,10 +74,10 @@ def get_CoxPH_plot(master, feature_vector):
 
 # TODO move these to a better place
 NUM_FEATURES = 34
-NUM_NEURONS = 16
-NUM_OUTPUTS = 8
+NUM_NEURONS = 64
+NUM_OUTPUTS = 12
 MONTHS = 24
-TIMESTEPS = 256
+TIMESTEPS = 48
 
 def get_LTC_plot(master, feature_vector):
     frame = ttk.Frame(master)
@@ -89,7 +89,7 @@ def get_LTC_plot(master, feature_vector):
     canvas_widget = canvas.get_tk_widget()
     canvas_widget.pack(fill="both", expand=True)
 
-    ltc_model = get_ltc_model(NUM_FEATURES, NUM_OUTPUTS, NUM_NEURONS)
+    ltc_model = get_model(NUM_FEATURES, NUM_OUTPUTS, NUM_NEURONS, lnn_type="LTC", network_sparsity=0.5, return_sequences=True)
     load_ltc_weights(ltc_model)
     
     pred = get_single_ltc_prediction(ltc_model, feature_vector, MONTHS, TIMESTEPS)

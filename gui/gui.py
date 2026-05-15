@@ -13,7 +13,7 @@ import ollama
 
 import json
 
-WINDOW_TITLE = "System Name"
+WINDOW_TITLE = "LNN CDSS"
 TITLE_FONT = ("TkDefaultFont", 24)
 H1_FONT = ("TkDefaultFont", 12)
 H2_FONT = ("TkDefaultFont", 10)
